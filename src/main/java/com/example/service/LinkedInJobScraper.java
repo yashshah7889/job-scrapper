@@ -57,10 +57,12 @@ public class LinkedInJobScraper {
     private static class Job {
         private final String title;
         private final String link;
+        private final boolean easyApply;
 
-        public Job(String title, String link) {
+        public Job(String title, String link, boolean easyApply) {
             this.title = title;
             this.link = link;
+            this.easyApply = easyApply;
         }
 
         public String getTitle() {
@@ -70,6 +72,10 @@ public class LinkedInJobScraper {
         public String getLink() {
             return link;
         }
+
+        public boolean isEasyApply() {
+            return easyApply;
+        }
     }
 
     // Main work happens: opening the browser, searching for jobs, collecting information, and then saving that information.
@@ -78,31 +84,36 @@ public class LinkedInJobScraper {
         WebDriver driver = new ChromeDriver(options); // Driver that controls Chrome browser.
 
         try {
+
             logger.info("Starting scrape for URL: {}", url);
             driver.get(url); // Tells browser to go to that URL.
 
-            WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(20)); // Await for conditions met.
+            WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(300)); // Await for conditions met.
 
             List<Job> jobs = new ArrayList<>();
             boolean hasNextPage = true;
 
             while (hasNextPage) {
-                wait.until(ExpectedConditions.presenceOfElementLocated(By.cssSelector("a.result-card__full-card-link")));
+                wait.until(ExpectedConditions.presenceOfElementLocated(By.cssSelector("a.job-card-container__link.job-card-list__title.job-card-list__title--link")));
 
                 // Wait until elements are visible and create element
-                List<WebElement> jobElements = wait.until(ExpectedConditions.visibilityOfAllElementsLocatedBy(By.cssSelector("a.result-card__full-card-link")));
+                List<WebElement> jobElements = wait.until(ExpectedConditions.visibilityOfAllElementsLocatedBy(By.cssSelector("a.job-card-container__link.job-card-list__title.job-card-list__title--link")));
+
 
                 // Scrape for current page
                 for (WebElement jobElement : jobElements) {
                     String title = jobElement.getText();
                     String link = jobElement.getAttribute("href");
-                    jobs.add(new Job(title, link));
-                    logger.info("Scraped job: Title={}, Link={}", title, link);
+
+                    //check for easy apply
+                    boolean easyApply = jobElement.findElements(By.cssSelector("span.job-card-container__easy-apply")).size() > 0;
+                    jobs.add(new Job(title, link,easyApply));
+                    logger.info("Scraped job: Title={}, Link={}", title, link,easyApply);
                 }
 
                 // Check if there is a "next" button
                 try {
-                    WebElement nextButton = driver.findElement(By.cssSelector("button.artdeco-pagination__button--next"));
+                    WebElement nextButton = driver.findElement(By.cssSelector("li.artdeco-pagination__indicator--number button[aria-label='Page 3']"));
                     if (nextButton.isEnabled()) {
                         nextButton.click();
                         // Wait for the next page to load by waiting for job elements to become stale
@@ -113,6 +124,7 @@ public class LinkedInJobScraper {
                 } catch (Exception e) {
                     hasNextPage = false; // No more pages
                 }
+
             }
             // Write jobs to CSV
             writeCsv("D:/study/self/linkedin_job_data.csv", jobs);
@@ -126,7 +138,7 @@ public class LinkedInJobScraper {
     }
 
     public void scrapeJobs() {
-        String url = "https://www.linkedin.com/jobs/search/?keywords=software%20engineer&location=Montreal%2C%20Quebec";
+        String url = "https://www.linkedin.com/jobs/search/?keywords=software%20developer&location=Canada";
         logger.info("Starting job scraping process.");
         scrapeWithSelenium(url);
         logger.info("Job scraping process completed.");
