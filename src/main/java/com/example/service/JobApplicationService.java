@@ -40,7 +40,7 @@ public class JobApplicationService {
             applyButton.click();
 
             // Handle the application process
-            // You might need to fill out forms or handle other interactions here
+
 
         } catch (Exception e) {
             e.printStackTrace();
