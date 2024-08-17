@@ -13,6 +13,8 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.NoSuchElementException;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -82,6 +84,9 @@ public class IndeedJobScraper {
     private void scrapeWithSelenium(String url) {
         ChromeOptions options = new ChromeOptions();//used to configure chrome browser
         //options.addArguments("--headless"); // Run in headless mode. willwork in background
+        options.addArguments("--disable-blink-features=AutomationControlled");
+        options.addArguments("--no-sandbox");
+        options.addArguments("--disable-dev-shm-usage");
         WebDriver driver = new ChromeDriver(options);//driver that controls chrome browser.
 
         try {
@@ -105,15 +110,28 @@ public class IndeedJobScraper {
 
                     //scrap for current page
                     for (WebElement jobElement : jobElements) {
-                        String title = jobElement.getText();
-                        String link =  jobElement.getAttribute("href");
+                        try{
+                                WebElement jobRow = jobElement.findElement(By.xpath("./ancestor::table"));
+                                boolean isEasyApply = false;
 
-                        //check for easy apply
-                        boolean easyApply = jobElement.findElements(By.cssSelector("div.css-10vq04l span.css-wftrf9 span.ialbl.iaTextBlack.css-130a5xa.eu4oa1w0")).size() > 0;
-                        jobs.add(new Job(title, link, easyApply));
-                        logger.info("Scraped job: Title={}, Link={}", title, link, easyApply);
+                            try {
+                                WebElement easyApplyElement = jobRow.findElement(By.xpath("following::div[contains(@class, 'css-10vq04l eu4oa1w0')]//span[contains(@class, 'ialbl')]"));
+                                isEasyApply = (easyApplyElement != null);
+                            } catch (Exception e) {
+                                    // Handle the case where "Easily apply" is not found
+                                    logger.debug("Easily apply tag not found for job: " + jobElement.getText());
+                            }
+
+                             // Process the job
+                            String title = jobElement.getText();
+                            String link =  jobElement.getAttribute("href");
+                            jobs.add(new Job(title, link, isEasyApply));
+                            logger.info("job added "+ jobElement.getText() );
+                        } catch (Exception e) {
+                            logger.error("Error processing job element: " + jobElement.getText(), e);
+                        }
                     }
-                    ((JavascriptExecutor) driver).executeScript("window.scrollTo(0, document.body.scrollHeight);");
+                   ((JavascriptExecutor) driver).executeScript("window.scrollTo(0, document.body.scrollHeight);");
                     logger.info("Scrolled to bottom of the page.");
 
                     // Wait for new jobs to load
@@ -157,7 +175,7 @@ public class IndeedJobScraper {
     }
 
     public void scrapeJobs() {
-        String url = "https://www.indeed.com/jobs?q=software%20engineer&l=montreal";
+        String url = "https://www.indeed.com/jobs?q=software%20engineer&l=ottawa";
         logger.info("Starting job scraping process.");
         scrapeWithSelenium(url);
         logger.info("Job scraping process completed.");
